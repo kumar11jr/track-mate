@@ -17,6 +17,7 @@ export default function Home() {
 
   return (
     <div>
+
       {alert && (
         <Alert variant="destructive">
           <Terminal />
@@ -26,8 +27,11 @@ export default function Home() {
           </AlertDescription>
         </Alert>
       )}
-      This is only tesing page and can be removed anytime.
-      <Button variant={"destructive"} onClick={handleClick}>Click</Button>
+
+
+
+      Hello from initial page
+      <Button variant={"destructive"} onClick={handleClick}>Click me</Button>
     </div>
 
     
