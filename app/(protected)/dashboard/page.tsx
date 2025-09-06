@@ -1,39 +1,53 @@
-"use client"
+// import LogoutComponent from "@/components/logoutComponent";
+import { getCurrentUser } from "@/lib/auth";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Terminal } from "lucide-react";
-import { useState } from "react";
 
-export default function Home() {
-  const[alert,setAlert] = useState(false);
-
-  const handleClick = () =>{
-    setAlert(true);
-    setTimeout(()=>{
-      setAlert(false);
-    },4000)
-  }
-
+export default async function DashboardPage() {
+    const user = await getCurrentUser();
   return (
-    <div>
+    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* User Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Welcome, {user?.name}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button variant="default">Create New Trip</Button>
+        </CardContent>
+      </Card>
 
-      {alert && (
-        <Alert variant="destructive">
-          <Terminal />
-          <AlertTitle>Heads up!</AlertTitle>
-          <AlertDescription>
-            You can add components and dependencies to your app using the cli.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* My Trips */}
+      <Card>
+        <CardHeader>
+          <CardTitle>My Trips</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul>
+            <li>
+              🚗 Trip to Taj Mahal – 2 Participants
+              <Button variant="outline" size="sm" className="ml-2">View</Button>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
-
-
-      Hello from initial page
-      <Button variant={"destructive"} onClick={handleClick}>Click me</Button>
+      {/* Invitations */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Invitations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul>
+            <li>
+              🎉 Invited by Ankit – Trip to Jaipur
+              <Button variant="secondary" size="sm" className="ml-2">Accept</Button>
+              <Button variant="destructive" size="sm" className="ml-2">Reject</Button>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
-
-    
   );
 }
