@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { UserPlus, MapPin } from "lucide-react";
+import AutoCompleteSearch from "@/components/autoCompleteSearch";
 
 export default function CreateTripPage() {
   const [destination, setDestination] = useState("");
@@ -38,21 +39,20 @@ export default function CreateTripPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Destination Search */}
           <div className="space-y-2">
             <Label htmlFor="destination">Search Destination</Label>
-            <Input
+            {/* <Input
               id="destination"
               placeholder="Type a place (e.g., Taj Mahal, Agra)"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
-            />
+            /> */}
+            <AutoCompleteSearch />
             <p className="text-sm text-muted-foreground">
               Start typing to search for a place. (Later connect with Google Places API)
             </p>
           </div>
 
-          {/* Add Friends */}
           <div className="space-y-2">
             <Label>Invite Friends (max 2)</Label>
             {friends.map((friend, idx) => (
@@ -78,7 +78,6 @@ export default function CreateTripPage() {
             )}
           </div>
 
-          {/* Submit */}
           <Button variant="default" className="w-full" onClick={handleSubmit}>
             Create Trip
           </Button>
