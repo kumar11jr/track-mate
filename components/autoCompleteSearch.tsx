@@ -1,39 +1,75 @@
 "use client"
 
-import React, {useRef,useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from './ui/input';
+import autoComplete from '@/lib/google';
 
-const AutoCompleteSearch = ():React.JSX.Element =>{
-    const inputRef = useRef<HTMLInputElement | null>(null);
+type PlaceAutocompleteResult = {
+    place_id: string;
+    description: string;
+    // add other fields if needed
+};
 
-    useEffect(()=>{
-        if(!window.google || !inputRef.current) return;
+const AutoCompleteSearch = (): React.JSX.Element => {
+    const [input, setInput] = useState('');
+    const [predictions, setPredictions] = useState<PlaceAutocompleteResult[]>([]);
 
-        const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current,{
-            fields:["place_id","geometry","name","formatted_address"],
-            types:["geocode"]
-        });
+    useEffect(() => {
+        if (input.trim().length < 2) {
+            setPredictions([]);
+            return;
+        }
 
-
-        autocomplete.addListener("place_changed",()=>{
-            const place: google.maps.place.PlaceResult = autocomplete.getPlace();
-
-            if(!place.geometry || !place.geometry.location){
-                console.error("No details available for input: '"+ place.name + "'");
-                return;
+        const timeoutId = setTimeout(async () => {
+            try {
+                const results = await autoComplete(input);
+                setPredictions(results);
+            } catch (error) {
+                console.error('Error fetching predictions:', error);
             }
+        }, 300);
 
-            console.log("Selected place:",{
-                address: place.formatted_address,
-                lat:place.geometry.location.lat(),
-                lng:place.geometry.location.lng()
-            });
-        })
-    },[]);
+        return () => clearTimeout(timeoutId);
+    }, [input]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInput(e.target.value);
+    };
+
+    const handlePredictionClick = (prediction: any) => {
+        setInput(prediction.description);
+        setPredictions([]);
+        
+        console.log("Selected place:", {
+            place_id: prediction.place_id,
+            address: prediction.description
+        });
+    };
 
     return (
-        <Input ref={inputRef} type='text' placeholder='Type a place (e.g., Taj Mahal, Agra)'/> 
+        <div className="relative">
+            <Input 
+                type='text' 
+                value={input}
+                onChange={handleInputChange}
+                placeholder='Type a place (e.g., Taj Mahal, Agra)' 
+            />
+            
+            {predictions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto z-10">
+                    {predictions.map((prediction: any) => (
+                        <div 
+                            key={prediction.place_id}
+                            className="p-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => handlePredictionClick(prediction)}
+                        >
+                            {prediction.description}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
     );
-}
+};
 
 export default AutoCompleteSearch;

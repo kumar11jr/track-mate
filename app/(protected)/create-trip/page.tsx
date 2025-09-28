@@ -41,12 +41,6 @@ export default function CreateTripPage() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="destination">Search Destination</Label>
-            {/* <Input
-              id="destination"
-              placeholder="Type a place (e.g., Taj Mahal, Agra)"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-            /> */}
             <AutoCompleteSearch />
             <p className="text-sm text-muted-foreground">
               Start typing to search for a place. (Later connect with Google Places API)
