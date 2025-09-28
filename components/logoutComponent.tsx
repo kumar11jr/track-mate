@@ -20,6 +20,7 @@ export default function LogoutComponent() {
     const [isLoading,setIsLoading] = useState(false);   
 
     const router = useRouter();
+    
     const handleLogOut = async() =>{
         setIsLoading(true);
     try{

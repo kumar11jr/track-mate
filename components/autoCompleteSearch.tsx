@@ -3,14 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import autoComplete from '@/lib/google';
+import { PlaceAutocompleteResult } from '@googlemaps/google-maps-services-js';
 
-type PlaceAutocompleteResult = {
-    place_id: string;
-    description: string;
-    // add other fields if needed
-};
+interface SelectedPlace {
+  place_id: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+}
 
-const AutoCompleteSearch = (): React.JSX.Element => {
+interface AutoCompleteSearchProps {
+  onPlaceSelect?: (place: SelectedPlace) => void;
+}
+
+const AutoCompleteSearch = ({ onPlaceSelect }: AutoCompleteSearchProps): React.JSX.Element => {
     const [input, setInput] = useState('');
     const [predictions, setPredictions] = useState<PlaceAutocompleteResult[]>([]);
 
@@ -40,10 +46,17 @@ const AutoCompleteSearch = (): React.JSX.Element => {
         setInput(prediction.description);
         setPredictions([]);
         
-        console.log("Selected place:", {
+        const selectedPlace: SelectedPlace = {
             place_id: prediction.place_id,
             address: prediction.description
-        });
+        };
+        
+        console.log("Selected place:", selectedPlace);
+        
+        // Call the callback if provided
+        if (onPlaceSelect) {
+            onPlaceSelect(selectedPlace);
+        }
     };
 
     return (

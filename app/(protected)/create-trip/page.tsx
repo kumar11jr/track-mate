@@ -5,12 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, MapPin } from "lucide-react";
+import { UserPlus, MapPin, Map } from "lucide-react";
 import AutoCompleteSearch from "@/components/autoCompleteSearch";
+import GoogleMapsDirections from "@/components/GoogleMapsDirections";
+
+interface SelectedPlace {
+  place_id: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+}
 
 export default function CreateTripPage() {
   const [destination, setDestination] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
   const [friends, setFriends] = useState([""]);
+  const [showMap, setShowMap] = useState(false);
 
   const handleAddFriend = () => {
     if (friends.length < 2) {
@@ -24,59 +34,106 @@ export default function CreateTripPage() {
     setFriends(updated);
   };
 
+  const handlePlaceSelect = (place: SelectedPlace) => {
+    setDestination(place.address);
+    setSelectedPlace(place);
+    console.log("Selected place:", place);
+  };
+
+  const handleShowDirections = () => {
+    if (selectedPlace) {
+      setShowMap(true);
+    }
+  };
+
   const handleSubmit = () => {
     // later: call /api/trips with Prisma
-    console.log({ destination, friends });
+    console.log({ destination, selectedPlace, friends });
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-red-500" />
-            Create a New Trip
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="destination">Search Destination</Label>
-            <AutoCompleteSearch />
-            <p className="text-sm text-muted-foreground">
-              Start typing to search for a place. (Later connect with Google Places API)
-            </p>
-          </div>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column - Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-red-500" />
+              Create a New Trip
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="destination">Search Destination</Label>
+              <AutoCompleteSearch onPlaceSelect={handlePlaceSelect} />
+              {selectedPlace && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="text-sm text-green-600 flex-1">
+                    ✓ Selected: {selectedPlace.address}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShowDirections}
+                    className="flex items-center gap-1"
+                  >
+                    <Map className="h-4 w-4" />
+                    Show Directions
+                  </Button>
+                </div>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label>Invite Friends (max 2)</Label>
-            {friends.map((friend, idx) => (
-              <Input
-                key={idx}
-                placeholder="Enter friend's email"
-                value={friend}
-                onChange={(e) => handleFriendChange(idx, e.target.value)}
-                className="mb-2"
+            <div className="space-y-2">
+              <Label>Invite Friends (max 2)</Label>
+              {friends.map((friend, idx) => (
+                <Input
+                  key={idx}
+                  placeholder="Enter friend's email"
+                  value={friend}
+                  onChange={(e) => handleFriendChange(idx, e.target.value)}
+                  className="mb-2"
+                />
+              ))}
+              {friends.length < 2 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddFriend}
+                  className="flex items-center gap-1"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Add Friend
+                </Button>
+              )}
+            </div>
+
+            <Button variant="default" className="w-full" onClick={handleSubmit}>
+              Create Trip
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Right Column - Map */}
+        {showMap && selectedPlace && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map className="h-5 w-5 text-blue-500" />
+                Directions to {selectedPlace.address.split(',')[0]}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GoogleMapsDirections
+                destination={selectedPlace}
+                onClose={() => setShowMap(false)}
               />
-            ))}
-            {friends.length < 2 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddFriend}
-                className="flex items-center gap-1"
-              >
-                <UserPlus className="h-4 w-4" />
-                Add Friend
-              </Button>
-            )}
-          </div>
-
-          <Button variant="default" className="w-full" onClick={handleSubmit}>
-            Create Trip
-          </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
