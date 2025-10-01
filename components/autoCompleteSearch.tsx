@@ -3,7 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import autoComplete from '@/lib/google';
+import { loadGoogleMapsScript } from '@/lib/loadGoogleMapsScript';
 import { PlaceAutocompleteResult } from '@googlemaps/google-maps-services-js';
+
+type GeocoderResult = {
+  geometry: {
+    location: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
+  [key: string]: any;
+}
+
+type GeocoderStatus = 'OK' | 'ZERO_RESULTS' | 'OVER_QUERY_LIMIT' | 'REQUEST_DENIED' | 'INVALID_REQUEST';
 
 interface SelectedPlace {
   place_id: string;
@@ -19,6 +32,28 @@ interface AutoCompleteSearchProps {
 const AutoCompleteSearch = ({ onPlaceSelect }: AutoCompleteSearchProps): React.JSX.Element => {
     const [input, setInput] = useState('');
     const [predictions, setPredictions] = useState<PlaceAutocompleteResult[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const initGoogleMaps = async () => {
+            try {
+                const response = await fetch('/api/maps-key');
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                await loadGoogleMapsScript(data.apiKey);
+            } catch (error) {
+                console.error('Error loading Google Maps:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        initGoogleMaps();
+    }, []);
 
     useEffect(() => {
         if (input.trim().length < 2) {
@@ -42,20 +77,48 @@ const AutoCompleteSearch = ({ onPlaceSelect }: AutoCompleteSearchProps): React.J
         setInput(e.target.value);
     };
 
-    const handlePredictionClick = (prediction: any) => {
+    const handlePredictionClick = async (prediction: any) => {
         setInput(prediction.description);
         setPredictions([]);
         
-        const selectedPlace: SelectedPlace = {
-            place_id: prediction.place_id,
-            address: prediction.description
-        };
-        
-        console.log("Selected place:", selectedPlace);
-        
-        // Call the callback if provided
-        if (onPlaceSelect) {
-            onPlaceSelect(selectedPlace);
+        try {
+            const geocoder = new window.google.maps.Geocoder();
+            const result = await new Promise<GeocoderResult>((resolve, reject) => {
+                geocoder.geocode(
+                    { placeId: prediction.place_id },
+                    (results: GeocoderResult[] | null, status: GeocoderStatus) => {
+                        if (status === "OK" && results && results[0]) {
+                            resolve(results[0]);
+                        } else {
+                            reject(new Error('Failed to get place details'));
+                        }
+                    }
+                );
+            });
+
+            const location = (result as any).geometry.location;
+            
+            const selectedPlace: SelectedPlace = {
+                place_id: prediction.place_id,
+                address: prediction.description,
+                lat: location.lat(),
+                lng: location.lng()
+            };
+            
+            console.log("Selected place with coordinates:", selectedPlace);
+            
+            if (onPlaceSelect) {
+                onPlaceSelect(selectedPlace);
+            }
+        } catch (error) {
+            console.error('Error getting place details:', error);
+            const selectedPlace: SelectedPlace = {
+                place_id: prediction.place_id,
+                address: prediction.description
+            };
+            if (onPlaceSelect) {
+                onPlaceSelect(selectedPlace);
+            }
         }
     };
 

@@ -1,7 +1,28 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { Loader2, Navigation, MapPin, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { loadGoogleMapsScript } from "@/lib/loadGoogleMapsScript";
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
+const TravelMode = {
+  DRIVING: 'DRIVING',
+  WALKING: 'WALKING',
+  BICYCLING: 'BICYCLING',
+  TRANSIT: 'TRANSIT'
+} as const;
+
+const UnitSystem = {
+  METRIC: 0,
+  IMPERIAL: 1
+} as const;
 
 interface SelectedPlace {
   place_id: string;
@@ -27,11 +48,44 @@ export default function GoogleMapsDirections({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
+  const [map, setMap] = useState<any>(null);
+  const [directionsService, setDirectionsService] = useState<any>(null);
+  const [directionsRenderer, setDirectionsRenderer] = useState<any>(null);
   const [distance, setDistance] = useState<string>("");
   const [duration, setDuration] = useState<string>("");
+  const [mapsApiKey, setMapsApiKey] = useState<string>("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeGoogleMaps = async () => {
+      try {
+        const response = await fetch('/api/maps-key');
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        if (isMounted) {
+          setMapsApiKey(data.apiKey);
+          await loadGoogleMapsScript(data.apiKey);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError("Failed to initialize Google Maps");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeGoogleMaps();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Get user's current location
   useEffect(() => {
@@ -57,37 +111,30 @@ export default function GoogleMapsDirections({
 
   // Initialize map and directions
   useEffect(() => {
-    if (!userLocation || !destination) return;
+    if (!userLocation || !destination || !window.google || !window.google.maps) return;
 
     const initMap = async () => {
       try {
-        // Check if Google Maps is loaded
-        if (!window.google || !window.google.maps) {
-          throw new Error("Google Maps not loaded");
-        }
-
-        // Create map centered between user location and destination
         const centerLat = (userLocation.lat + (destination.lat || 0)) / 2;
         const centerLng = (userLocation.lng + (destination.lng || 0)) / 2;
 
         const mapElement = document.getElementById("map");
         if (!mapElement) return;
 
-        const mapInstance = new google.maps.Map(mapElement, {
+        const mapInstance = new window.google.maps.Map(mapElement, {
           center: { lat: centerLat, lng: centerLng },
           zoom: 12,
           mapTypeControl: false,
           streetViewControl: false,
         });
 
-        // Create markers for user location and destination
         // User location marker (blue)
-        new google.maps.Marker({
+        new window.google.maps.Marker({
           position: userLocation,
           map: mapInstance,
           title: "Your Location",
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
+            path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: "#4285F4",
             fillOpacity: 1,
             strokeColor: "#ffffff",
@@ -97,7 +144,7 @@ export default function GoogleMapsDirections({
         });
 
         // Add a pulsing circle around user location
-        new google.maps.Circle({
+        new window.google.maps.Circle({
           map: mapInstance,
           center: userLocation,
           radius: 50,
@@ -109,7 +156,7 @@ export default function GoogleMapsDirections({
         });
 
         // Destination marker (red)
-        new google.maps.Marker({
+        new window.google.maps.Marker({
           position: { 
             lat: destination.lat || 0, 
             lng: destination.lng || 0 
@@ -121,11 +168,10 @@ export default function GoogleMapsDirections({
           },
         });
 
-        // Initialize directions service and renderer
-        const service = new google.maps.DirectionsService();
-        const renderer = new google.maps.DirectionsRenderer({
+        const service = new window.google.maps.DirectionsService();
+        const renderer = new window.google.maps.DirectionsRenderer({
           map: mapInstance,
-          suppressMarkers: true, // We're using custom markers
+          suppressMarkers: true, 
           polylineOptions: {
             strokeColor: "#4285F4",
             strokeWeight: 5,
@@ -137,22 +183,20 @@ export default function GoogleMapsDirections({
         setDirectionsService(service);
         setDirectionsRenderer(renderer);
 
-        // Calculate and display route
         if (destination.lat && destination.lng) {
-          const request: google.maps.DirectionsRequest = {
+          const request = {
             origin: userLocation,
             destination: { lat: destination.lat, lng: destination.lng },
-            travelMode: google.maps.TravelMode.DRIVING,
-            unitSystem: google.maps.UnitSystem.METRIC,
+            travelMode: TravelMode.DRIVING,
+            unitSystem: UnitSystem.METRIC,
             avoidHighways: false,
             avoidTolls: false,
           };
 
-          service.route(request, (result, status) => {
+          service.route(request, (result: any, status: string) => {
             if (status === "OK" && result) {
               renderer.setDirections(result);
               
-              // Extract distance and duration
               const route = result.routes[0];
               if (route && route.legs && route.legs[0]) {
                 setDistance(route.legs[0].distance?.text || "");
@@ -174,24 +218,22 @@ export default function GoogleMapsDirections({
       }
     };
 
-    // Load map after a short delay to ensure container is rendered
     const timer = setTimeout(initMap, 100);
     return () => clearTimeout(timer);
   }, [userLocation, destination]);
 
-  // Handle travel mode change
-  const changeTravelMode = (mode: google.maps.TravelMode) => {
+  const changeTravelMode = (mode: string) => {
     if (!directionsService || !userLocation || !destination.lat || !destination.lng) return;
 
     setIsLoading(true);
-    const request: google.maps.DirectionsRequest = {
+    const request: any = {
       origin: userLocation,
       destination: { lat: destination.lat, lng: destination.lng },
       travelMode: mode,
-      unitSystem: google.maps.UnitSystem.METRIC,
+      unitSystem: UnitSystem.METRIC,
     };
 
-    directionsService.route(request, (result, status) => {
+    directionsService.route(request, (result: any, status: string) => {
       if (status === "OK" && result && directionsRenderer) {
         directionsRenderer.setDirections(result);
         const route = result.routes[0];
@@ -212,7 +254,6 @@ export default function GoogleMapsDirections({
         </Alert>
       )}
 
-      {/* Map Container */}
       <div className="relative">
         <div 
           id="map" 
@@ -228,7 +269,6 @@ export default function GoogleMapsDirections({
           </div>
         )}
 
-        {/* Close button */}
         {onClose && (
           <Button
             variant="ghost"
@@ -241,7 +281,6 @@ export default function GoogleMapsDirections({
         )}
       </div>
 
-      {/* Route Information */}
       {(distance || duration) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
@@ -259,12 +298,11 @@ export default function GoogleMapsDirections({
         </div>
       )}
 
-      {/* Travel Mode Buttons */}
       <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
-          onClick={() => changeTravelMode(google.maps.TravelMode.DRIVING)}
+          onClick={() => changeTravelMode(TravelMode.DRIVING)}
           disabled={isLoading}
         >
           🚗 Driving
@@ -272,7 +310,7 @@ export default function GoogleMapsDirections({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => changeTravelMode(google.maps.TravelMode.WALKING)}
+          onClick={() => changeTravelMode(TravelMode.WALKING)}
           disabled={isLoading}
         >
           🚶 Walking
@@ -280,7 +318,7 @@ export default function GoogleMapsDirections({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => changeTravelMode(google.maps.TravelMode.BICYCLING)}
+          onClick={() => changeTravelMode(TravelMode.BICYCLING)}
           disabled={isLoading}
         >
           🚴 Cycling
@@ -288,14 +326,13 @@ export default function GoogleMapsDirections({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => changeTravelMode(google.maps.TravelMode.TRANSIT)}
+          onClick={() => changeTravelMode(TravelMode.TRANSIT)}
           disabled={isLoading}
         >
           🚌 Transit
         </Button>
       </div>
 
-      {/* Legend */}
       <div className="text-xs text-gray-500 space-y-1 border-t pt-3">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
