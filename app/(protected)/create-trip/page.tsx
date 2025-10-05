@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, MapPin, Map } from "lucide-react";
+import { UserPlus, MapPin, Map, Loader2 } from "lucide-react";
 import AutoCompleteSearch from "@/components/autoCompleteSearch";
 import GoogleMapsDirections from "@/components/GoogleMapsDirections";
+import { toast } from "sonner";
 
 interface SelectedPlace {
   place_id: string;
@@ -17,10 +19,12 @@ interface SelectedPlace {
 }
 
 export default function CreateTripPage() {
+  const router = useRouter();
   const [destination, setDestination] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
   const [friends, setFriends] = useState([""]);
   const [showMap, setShowMap] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleAddFriend = () => {
     if (friends.length < 2) {
@@ -46,9 +50,61 @@ export default function CreateTripPage() {
     }
   };
 
-  const handleSubmit = () => {
-    // later: call /api/trips with Prisma
-    console.log({ destination, selectedPlace, friends });
+  const handleSubmit = async () => {
+    // Validate destination
+    if (!selectedPlace || !destination) {
+      toast.error("Please select a destination");
+      return;
+    }
+
+    // Filter out empty email fields
+    const validFriends = friends.filter(f => f.trim() !== '');
+
+    // Validate emails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = validFriends.filter(email => !emailRegex.test(email));
+    
+    if (invalidEmails.length > 0) {
+      toast.warning('Please enter valid email addresses');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Get current user ID from your auth system
+      // Example: const session = await getSession();
+      // const creatorId = session?.user?.id;
+      const creatorId = "YOUR_USER_ID"; // Replace with actual user ID from auth
+
+      const response = await fetch('/api/trips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          destination: selectedPlace.address,
+          friendEmails: validFriends,
+          creatorId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create trip');
+      }
+
+      toast.success(`Trip created! Invitations sent to ${validFriends.length} friend(s).`);
+
+      // Redirect to trip details or dashboard
+      router.push(`/trips/${data.trip.id}`);
+    } catch (error) {
+      console.error('Error creating trip:', error);
+      toast.error("Failed to create trip");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -87,13 +143,18 @@ export default function CreateTripPage() {
 
             <div className="space-y-2">
               <Label>Invite Friends (max 2)</Label>
+              <p className="text-sm text-gray-500">
+                Friends must have an account to receive invitations
+              </p>
               {friends.map((friend, idx) => (
                 <Input
                   key={idx}
+                  type="email"
                   placeholder="Enter friend's email"
                   value={friend}
                   onChange={(e) => handleFriendChange(idx, e.target.value)}
                   className="mb-2"
+                  disabled={loading}
                 />
               ))}
               {friends.length < 2 && (
@@ -103,6 +164,7 @@ export default function CreateTripPage() {
                   size="sm"
                   onClick={handleAddFriend}
                   className="flex items-center gap-1"
+                  disabled={loading}
                 >
                   <UserPlus className="h-4 w-4" />
                   Add Friend
@@ -110,8 +172,20 @@ export default function CreateTripPage() {
               )}
             </div>
 
-            <Button variant="default" className="w-full" onClick={handleSubmit}>
-              Create Trip
+            <Button 
+              variant="default" 
+              className="w-full" 
+              onClick={handleSubmit}
+              disabled={loading || !selectedPlace}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Trip...
+                </>
+              ) : (
+                "Create Trip"
+              )}
             </Button>
           </CardContent>
         </Card>
