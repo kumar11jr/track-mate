@@ -8,10 +8,20 @@ export async function sendInviteEmail(
   trip: any,
   participantId: string
 ) {
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${participantId}`;
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not set');
+  }
+  if (!process.env.EMAIL_FROM) {
+    console.warn('EMAIL_FROM is not set; using fallback. This may be blocked by Resend if the domain is not verified.');
+  }
+  if (!process.env.NEXT_PUBLIC_APP_URL) {
+    console.warn('NEXT_PUBLIC_APP_URL is not set; invite links may be invalid.');
+  }
+
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/invite/${participantId}`;
 
   try {
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || 'trips@yourdomain.com',
       to: recipientEmail,
       subject: `🌍 You're invited to join a trip!`,
@@ -70,7 +80,12 @@ export async function sendInviteEmail(
       `,
     });
 
-    console.log(`Invitation email sent to ${recipientEmail}`);
+    if (error) {
+      console.error('Resend email error:', error);
+      throw new Error(typeof error === 'string' ? error : (error?.message || 'Unknown email error'));
+    }
+
+    console.log(`Invitation email enqueued for ${recipientEmail}. id=${data?.id ?? 'n/a'}`);
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('Failed to send invitation email');

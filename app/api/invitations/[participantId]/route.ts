@@ -1,16 +1,18 @@
 import { PrismaClient } from "@/app/generated/prisma";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 
 const prisma = new PrismaClient();
 
 export async function GET(
     req:Request,
-    {params}:{params:{participantId:string}}
+    context:{params:Promise<{participantId:string}>}
 ){
     try{
+        const {participantId} = await context.params;
         const participant = await prisma.participant.findUnique({
-            where:{id:params.participantId},
+            where:{id:participantId},
             include:{
                 trip:{
                     include:{
@@ -39,7 +41,7 @@ export async function GET(
         }
 
 
-        if(participant.status==="PENDING"){
+        if(participant.status!=="PENDING"){
             return NextResponse.json(
             { 
                 error: 'Invitation already processed',
@@ -63,20 +65,27 @@ export async function GET(
 
 export async function POST(
     req:Request,
-    {params}:{params:{participantId:string}}
+    context:{params:Promise<{participantId:string}>}
 ){
     try{
-        const {action,userId} = await req.json();
+        const {participantId} = await context.params;
+        const {action} = await req.json();
 
-        if(!["ACCEPT","REJECT"].includes(action)){
+        const normalizedAction = typeof action === 'string' ? action.toLowerCase() : '';
+        if(!["accept","reject"].includes(normalizedAction)){
             return NextResponse.json(
                 {error:"Invalid action"},
                 {status:400}
             );
         }
 
+        const currentUser = await getCurrentUser();
+        if(!currentUser){
+            return NextResponse.json({error:"Unauthorized"},{status:401});
+        }
+
         const participant = await prisma.participant.findUnique({
-            where:{id:params.participantId},
+            where:{id:participantId},
             include:{
                 trip:true
             }
@@ -89,7 +98,7 @@ export async function POST(
             )
         }
 
-        if(participant.id!==userId){
+        if(participant.userId!==currentUser.id){
             return NextResponse.json(
                 {error:"Unauthorized action"},
                 {status:403}
@@ -106,10 +115,10 @@ export async function POST(
             );
         }
 
-        const newStatus = action === "ACCEPT" ? "ACCEPTED" : "REJECTED";
+        const newStatus = normalizedAction === "accept" ? "ACCEPTED" : "REJECTED";
         
         const updatedParticipant = await prisma.participant.update({
-            where: { id: params.participantId },
+            where: { id: participantId },
             data: { status: newStatus },
             include: {
                 trip: true,
@@ -124,7 +133,7 @@ export async function POST(
 
         return NextResponse.json({
             success: true,
-            message: `Invitation ${action}ed  successfully`,
+            message: `Invitation ${normalizedAction === 'accept' ? 'accepted' : 'rejected'} successfully`,
             participant: updatedParticipant
         })
     }catch(error){

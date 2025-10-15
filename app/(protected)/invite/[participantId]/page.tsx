@@ -61,19 +61,13 @@ export default function InvitePage() {
     setResponding(true);
 
     try {
-      // Get current user ID from your auth system
-      // const session = await getSession();
-      // const userId = session?.user?.id;
-      const userId = "YOUR_USER_ID"; // Replace with actual user ID from auth
-
       const response = await fetch(`/api/invitations/${participantId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action,
-          userId,
+          action, // server derives user from cookie
         }),
       });
 
