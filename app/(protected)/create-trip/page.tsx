@@ -72,11 +72,6 @@ export default function CreateTripPage() {
     setLoading(true);
 
     try {
-      // Get current user ID from your auth system
-      // Example: const session = await getSession();
-      // const creatorId = session?.user?.id;
-      const creatorId = "YOUR_USER_ID"; // Replace with actual user ID from auth
-
       const response = await fetch('/api/trips', {
         method: 'POST',
         headers: {
@@ -85,7 +80,6 @@ export default function CreateTripPage() {
         body: JSON.stringify({
           destination: selectedPlace.address,
           friendEmails: validFriends,
-          creatorId,
         }),
       });
 

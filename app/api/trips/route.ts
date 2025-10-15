@@ -1,43 +1,53 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@/app/generated/prisma";
 import {sendInviteEmail} from "@/lib/email";
+import { getCurrentUser } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 
 export async function POST(req:Request){
     try{
-        const {destination, friendEmail, creatorId} = await req.json();
+        const { destination, friendEmails } = await req.json();
 
-        if(!destination || !friendEmail || !creatorId){
+        // destination is required; friendEmails is optional. creatorId is derived from auth
+        if(!destination){
             return NextResponse.json(
                 {error: "Missing required fields"},
                 {status: 400}
             );
         }
 
+        const currentUser = await getCurrentUser();
+        if(!currentUser){
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
+        }
+
         const trip = await prisma.trip.create({
             data:{
                 destination,
-                creatorId
+                creatorId: currentUser.id
             },
         });
 
         await prisma.participant.create({
             data:{
                 tripId: trip.id,
-                userId: creatorId,
+                userId: currentUser.id,
                 status: "ACCEPTED"
             },
         }); 
 
-        const validEmail = friendEmail.filter((email:String)=>{
-            email.trim()!=='';
-        })
+        const validEmails = Array.isArray(friendEmails)
+            ? friendEmails.filter((email: string) => Boolean(email && email.trim() !== ''))
+            : [];
 
-        for(const email of validEmail){
+        for(const email of validEmails){
             const invitedUser = await prisma.user.findUnique({
-                where:{email:email.trim()},
+                where:{email: email.trim()},
             });
 
             if(invitedUser){

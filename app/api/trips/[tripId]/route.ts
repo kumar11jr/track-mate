@@ -7,11 +7,12 @@ const prisma = new PrismaClient();
 // Get trip details with participants
 export async function GET(
   req: Request,
-  { params }: { params: { tripId: string } }
+  context: { params: Promise<{ tripId: string }> }
 ) {
   try {
+    const { tripId } = await context.params;
     const trip = await prisma.trip.findUnique({
-      where: { id: params.tripId },
+      where: { id: tripId },
       include: {
         creator: {
           select: {
@@ -77,14 +78,15 @@ export async function GET(
 // Update trip (optional - for editing destination)
 export async function PATCH(
   req: Request,
-  { params }: { params: { tripId: string } }
+  context: { params: Promise<{ tripId: string }> }
 ) {
   try {
     const { destination, userId } = await req.json();
+    const { tripId } = await context.params;
 
     // Verify user is the creator
     const trip = await prisma.trip.findUnique({
-      where: { id: params.tripId },
+      where: { id: tripId },
     });
 
     if (!trip) {
@@ -102,7 +104,7 @@ export async function PATCH(
     }
 
     const updatedTrip = await prisma.trip.update({
-      where: { id: params.tripId },
+      where: { id: tripId },
       data: { destination },
       include: {
         creator: {
@@ -142,14 +144,15 @@ export async function PATCH(
 // Delete trip (optional)
 export async function DELETE(
   req: Request,
-  { params }: { params: { tripId: string } }
+  context: { params: Promise<{ tripId: string }> }
 ) {
   try {
     const { userId } = await req.json();
+    const { tripId } = await context.params;
 
     // Verify user is the creator
     const trip = await prisma.trip.findUnique({
-      where: { id: params.tripId },
+      where: { id: tripId },
     });
 
     if (!trip) {
@@ -168,12 +171,12 @@ export async function DELETE(
 
     // Delete participants first (if not using cascade)
     await prisma.participant.deleteMany({
-      where: { tripId: params.tripId },
+      where: { tripId },
     });
 
     // Delete trip
     await prisma.trip.delete({
-      where: { id: params.tripId },
+      where: { id: tripId },
     });
 
     return NextResponse.json({
