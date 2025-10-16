@@ -58,7 +58,8 @@ export async function POST(req:Request){
                         status:"PENDING"
                     }
                 });
-
+                // this method is not good if the email service is down it will crash the whole endpoint and still create the data in db.
+                // TODO : use queue to send emails.
                 await sendInviteEmail (
                     invitedUser.email,
                     invitedUser.name,
