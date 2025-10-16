@@ -24,7 +24,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   trips Trip[] @relation("TripCreator")
-  participants Participant[] 
+  participants Participant[]
 }
 
 model Trip{
@@ -43,6 +43,20 @@ model Participant{
   user User @relation(fields: [userId], references: [id])
   userId String
   status Status @default(PENDING)
+  locations Location[]
+}
+
+model Location {
+  id String @id @default(uuid())
+  participantId String
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  latitude Float
+  longitude Float
+  accuracy Float?
+  heading Float?
+  speed Float?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 enum Status {
