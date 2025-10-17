@@ -18,6 +18,22 @@ services:
       retries: 20
     restart: unless-stopped
 
+  kafka:
+    image: docker.redpanda.com/vectorized/redpanda:v24.2.11
+    command:
+      - redpanda start
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://kafka:9092
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -28,11 +44,14 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-trackmate}?schema=public
       NODE_ENV: production
       PORT: 3000
+      KAFKA_BROKERS: kafka:9092
     ports:
       - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
+      kafka:
+        condition: service_started
     restart: unless-stopped
 
 volumes:
