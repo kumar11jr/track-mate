@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, User, Calendar, Users, Loader2, CheckCircle, Clock, XCircle } from "lucide-react";
+import RealTimeTripMap from "@/components/RealTimeTripMap";
+import { geocodeAddress } from "@/lib/geocode";
 
 interface Participant {
   id: string;
@@ -46,6 +48,9 @@ export default function TripDetailsPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentParticipantId, setCurrentParticipantId] = useState<string | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{ lat?: number; lng?: number }>({});
 
   useEffect(() => {
     fetchTripDetails();
@@ -53,6 +58,21 @@ export default function TripDetailsPage() {
     const interval = setInterval(fetchTripDetails, 30000);
     return () => clearInterval(interval);
   }, [tripId]);
+
+  // Geocode destination address
+  useEffect(() => {
+    if (trip?.destination) {
+      console.log(`Geocoding destination: ${trip.destination}`);
+      geocodeAddress(trip.destination).then((coords) => {
+        if (coords) {
+          console.log(`Destination coordinates received:`, coords);
+          setDestinationCoords(coords);
+        } else {
+          console.error('Failed to geocode destination');
+        }
+      });
+    }
+  }, [trip?.destination]);
 
   const fetchTripDetails = async () => {
     try {
@@ -64,6 +84,28 @@ export default function TripDetailsPage() {
       }
 
       setTrip(data.trip);
+
+      // Find current user's participant ID
+      const allParticipants = [
+        ...data.trip.participantsByStatus.accepted,
+        ...data.trip.participantsByStatus.pending,
+        ...data.trip.participantsByStatus.rejected,
+      ];
+
+      // Fetch current user info
+      const userResponse = await fetch('/api/auth/me');
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        setCurrentUserId(userData.user.id);
+
+        // Find participant record for current user
+        const userParticipant = allParticipants.find(
+          (p: Participant) => p.user.id === userData.user.id
+        );
+        if (userParticipant) {
+          setCurrentParticipantId(userParticipant.id);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load trip');
     } finally {
@@ -168,6 +210,22 @@ export default function TripDetailsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Real-Time Map */}
+      {currentUserId && currentParticipantId && (
+        <Card>
+          <CardContent className="pt-6">
+            <RealTimeTripMap
+              tripId={tripId}
+              destination={trip.destination}
+              destinationLat={destinationCoords.lat}
+              destinationLng={destinationCoords.lng}
+              currentUserId={currentUserId}
+              currentParticipantId={currentParticipantId}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Participants Lists */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

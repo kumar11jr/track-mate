@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@/app/generated/prisma";
-import {sendInviteEmail} from "@/lib/email";
+import { getKafkaProducer, EMAIL_INVITE_TOPIC } from "@/lib/kafka";
 import { getCurrentUser } from "@/lib/auth";
 
 const prisma = new PrismaClient();
@@ -58,14 +58,25 @@ export async function POST(req:Request){
                         status:"PENDING"
                     }
                 });
-                // this method is not good if the email service is down it will crash the whole endpoint and still create the data in db.
-                // TODO : use queue to send emails.
-                await sendInviteEmail (
-                    invitedUser.email,
-                    invitedUser.name,
-                    trip,
-                    participant.id
-                );
+                // Enqueue invite email to Kafka to be handled asynchronously
+                try{
+                    const producer = await getKafkaProducer();
+                    await producer.send({
+                        topic: EMAIL_INVITE_TOPIC,
+                        messages: [
+                            {
+                                value: JSON.stringify({
+                                    recipientEmail: invitedUser.email,
+                                    recipientName: invitedUser.name,
+                                    trip,
+                                    participantId: participant.id,
+                                })
+                            }
+                        ]
+                    });
+                }catch(e){
+                    console.error('Failed to enqueue invite email', e);
+                }
             }else{
                 console.log(`User with email ${email} not found`);
 
