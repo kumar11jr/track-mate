@@ -52,3 +52,25 @@ export async function logoutUser(){
 }
 
 
+export async function getUserTrips(userId:String){
+    return prisma.trip.findMany({
+        where:{
+            OR:[
+                {creatorId:userId as string},
+                {participants:{some:{userId:userId as string}}}
+            ]
+        },
+        orderBy:{
+            createdAt:"desc"
+        },
+        include:{
+            creator:true,
+            participants:{
+                include:{
+                    user:true
+                }
+            }
+        }
+    })
+}
+

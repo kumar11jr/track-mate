@@ -1,29 +1,44 @@
-
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN apk add --no-cache openssl libc6-compat
 
-RUN npm install --frozen-lockfile
+COPY package*.json ./
+RUN npm ci
+
+COPY prisma ./prisma
+COPY app/generated/prisma ./app/generated/prisma
+
+RUN npx prisma generate
 
 COPY . .
 
+ENV NODE_ENV=production
 RUN npm run build
 
 
 
 
-
-
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
+
+RUN apk add --no-cache openssl libc6-compat
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    NEXT_SHARP_PATH=/app/node_modules/sharp
 
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/app/generated/prisma ./app/generated/prisma
+
+COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["/bin/sh", "./scripts/entrypoint.sh"]
