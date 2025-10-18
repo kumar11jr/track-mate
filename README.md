@@ -25,9 +25,6 @@ Track-Mate is a real-time trip planning and tracking application built with Next
   - Prisma ORM
   - PostgreSQL Database
 
-- **Authentication:**
-  - NextAuth.js
-
 - **Maps & Location:**
   - Google Maps JavaScript API
   - Google Places API
@@ -55,10 +52,14 @@ cd track-mate
 npm install
 ```
 
-3. Create a `.env.local` file with the following variables:
+3. Create a `.env` file with the following variables:
 ```env
 DATABASE_URL="your_postgresql_database_url"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
+RESEND_API_KEY="your_key"
+EMAIL_FROM="your_domian_email"
+NEXT_PUBLIC_APP_URL = "your_url"
+KAFKA_BROKER = ""
 ```
 
 4. Set up the database:
@@ -68,6 +69,22 @@ npx prisma migrate dev
 ```
 
 5. Run the development server:
+```bash
+docker run -d \
+  --name kafka \
+  -p 9092:9092 \
+  redpandadata/redpanda:v24.2.11 \
+  redpanda start \
+  --kafka-addr=PLAINTEXT://0.0.0.0:9092 \
+  --advertise-kafka-addr=PLAINTEXT://localhost:9092 \
+  --overprovisioned \
+  --smp=1 \
+  --memory=1G
+```
+```bash
+npm run worker:email
+```
+
 ```bash
 npm run dev
 ```
@@ -94,18 +111,24 @@ components/
 ├── ui/               # Reusable UI components
 ├── GoogleMapsDirections.tsx
 ├── AutoCompleteSearch.tsx
+├── RealTimeTripMap.tsx
 └── LogoutComponent.tsx
 lib/
 ├── auth.ts           # Authentication utilities
 ├── prisma.ts         # Database client
+├── email.ts          # Invitation logic
+├── kafka.ts          # queue logic
 └── google.ts         # Google Maps utilities
 prisma/
 └── schema.prisma     # Database schema
+service/
+├── emailWorker.ts    # kafka worker
+└── entrypoint.sh
 ```
 
 ## Features in Development 🔄
 
-- [ ] Real-time location sharing between trip participants
+- [x] Real-time location sharing between trip participants
 - [ ] Chat functionality for trip participants
 - [ ] Trip history and statistics
 - [ ] Multiple destination support
